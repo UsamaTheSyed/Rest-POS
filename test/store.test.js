@@ -1,0 +1,37 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {openStore} from '../lib/store.js';
+import {createApp} from '../server.js';
+
+function fixture(t){const store=openStore(':memory:');t.after(()=>store.db.close());const owner=store.setup({restaurant:'Test Restaurant',name:'Owner',email:'owner@example.com',password:'test-password-123'});return {store,owner};}
+const order=(changes={})=>({requestKey:'order-one',type:'Dine-in',payment:'Cash',customer:'Table 4',note:'No onions',items:[{id:1,qty:2,price:1}],expectedTotal:1180,...changes});
+test('owners can add a custom-category item, sell it in bulk and audit creation',t=>{
+  const {store,owner}=fixture(t);
+  const product=store.addProduct(owner,{name:'Chicken Biryani',category:'Desi',description:'Rice & chicken',price:450.50,tag:'Lunch',available:true});
+  assert.equal(store.menu(owner).find(p=>p.id===product.id).price,450.50);
+  const sale=store.createOrder(owner,order({items:[{id:product.id,qty:125}],expectedTotal:56312.5}));
+  assert.equal(sale.items[0].qty,125);assert.equal(sale.total,56312.5);
+  assert.ok(store.audit(owner).some(e=>e.action==='menu.created'&&e.entity_id===product.id));
+  assert.throws(()=>store.createOrder(owner,order({requestKey:'too-many',items:[{id:product.id,qty:1000}],expectedTotal:450500})),/quantity/);
+});
+test('menu creation rejects non-owners and malformed input without inserting items',t=>{
+  const {store,owner}=fixture(t),input={name:'Tea',category:'Drinks',price:100,available:true};
+  const before=store.menu(owner).length;
+  assert.throws(()=>store.addProduct({...owner,role:'cashier'},input),/Owner/);
+  for(const changes of [{name:''},{category:''},{price:-1},{price:1.001},{price:'100'},{available:'yes'},{description:'x'.repeat(301)}])assert.throws(()=>store.addProduct(owner,{...input,...changes}));
+  assert.equal(store.menu(owner).length,before);
+  const product=store.addProduct(owner,{...input,available:false});
+  assert.throws(()=>store.createOrder(owner,order({items:[{id:product.id,qty:1}],expectedTotal:100})),/unavailable/);
+});
+test('setup is atomic and cannot be repeated',t=>{const {store}=fixture(t);assert.equal(store.needsSetup(),false);assert.throws(()=>store.setup({}),/already/);assert.equal(store.db.prepare('SELECT COUNT(*) AS n FROM restaurants').get().n,1);});
+test('password hashes, session expiration and logout',t=>{const {store,owner}=fixture(t);assert.throws(()=>store.login({email:owner.email,password:'wrong'}),/credentials/);const session=store.login({email:owner.email,password:'test-password-123'});assert.equal(store.session(session.token).id,owner.id);assert.notEqual(store.db.prepare('SELECT password FROM users').get().password,'test-password-123');store.logout(session.token);assert.equal(store.session(session.token),null);});
+test('authoritative prices, quantities and immutable price snapshots',t=>{const {store,owner}=fixture(t);store.settings(owner,{name:'Test',tax_bps:500});const saved=store.createOrder(owner,order({expectedTotal:1239}));assert.equal(saved.subtotal,1180);assert.equal(saved.tax,59);assert.equal(saved.total,1239);store.updateProduct(owner,1,{price:999,available:true});assert.equal(store.getOrder(owner,saved.id).items[0].price,590);});
+test('retries return same order; changed payload is rejected',t=>{const {store,owner}=fixture(t);const one=store.createOrder(owner,order());const two=store.createOrder(owner,order());assert.equal(one.id,two.id);assert.equal(store.orders(owner).length,1);assert.equal(store.orderByKey(owner,'order-one').id,one.id);assert.equal(store.orderByKey({...owner,restaurant_id:999},'order-one'),null);assert.throws(()=>store.createOrder(owner,order({note:'Changed'})),/already used/);});
+test('bad quantity, missing items and stale prices do not write sales',t=>{const {store,owner}=fixture(t);for(const items of [[{id:1,qty:-1}],[{id:1,qty:1.5}],[{id:999,qty:1}],[null],[]])assert.throws(()=>store.createOrder(owner,order({items})));assert.throws(()=>store.createOrder(owner,order({expectedTotal:1})),/prices or tax/);assert.equal(store.orders(owner).length,0);});
+test('staff cannot escalate privileges and kitchen transitions are sequential',t=>{const {store,owner}=fixture(t);const cashier=store.addUser(owner,{name:'Cashier',email:'cashier@example.com',password:'test-password-123',role:'cashier'});const kitchen=store.addUser(owner,{name:'Chef',email:'chef@example.com',password:'test-password-123',role:'kitchen'});assert.throws(()=>store.settings(cashier,{name:'X',tax_bps:0}),/Owner/);assert.throws(()=>store.addUser(cashier,{}),/Owner/);assert.throws(()=>store.createOrder(kitchen,order()),/Cashier/);const saved=store.createOrder(cashier,order());assert.throws(()=>store.status(cashier,saved.id,'preparing'),/Kitchen/);assert.throws(()=>store.status(kitchen,saved.id,'served'),/transition/);for(const status of ['preparing','ready','served'])assert.equal(store.status(kitchen,saved.id,status).status,status);assert.throws(()=>store.status(kitchen,saved.id,'queued'),/transition/);});
+test('restaurant-scoped reads and writes reject another restaurant records',t=>{const {store,owner}=fixture(t);store.db.prepare('INSERT INTO restaurants(id,name) VALUES(?,?)').run(2,'Other');const other={...owner,restaurant_id:2};const saved=store.createOrder(owner,order());assert.deepEqual(store.orders(other),[]);assert.deepEqual(store.menu(other),[]);assert.throws(()=>store.getOrder(other,saved.id),/not found/);assert.throws(()=>store.status(other,saved.id,'preparing'),/not found/);assert.throws(()=>store.updateProduct(other,1,{price:5,available:true}),/not found/);assert.throws(()=>store.createOrder(other,order()),/unavailable/);});
+test('sales persist after database restart',()=>{const directory=mkdtempSync(path.join(tmpdir(),'ember-test-')),filename=path.join(directory,'test.sqlite');let store=openStore(filename);try{const owner=store.setup({restaurant:'Persistent',name:'Owner',email:'persistent@example.com',password:'test-password-123'});const saved=store.createOrder(owner,order());store.db.close();store=openStore(filename);assert.equal(store.getOrder(owner,saved.id).total,1180);}finally{store.db.close();rmSync(directory,{recursive:true,force:true});}});
+test('HTTP requires sessions, enforces origin and returns HttpOnly cookies',async t=>{const {store,owner}=fixture(t);const server=createApp(store);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));const base=`http://127.0.0.1:${server.address().port}`;assert.equal((await fetch(base+'/api/orders')).status,401);const login=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:owner.email,password:'test-password-123'})});assert.equal(login.status,200);const cookie=login.headers.get('set-cookie');assert.match(cookie,/HttpOnly/);const headers={'Content-Type':'application/json',Cookie:cookie.split(';')[0]};assert.equal((await fetch(base+'/api/menu',{headers})).status,200);assert.equal((await fetch(base+'/api/orders',{method:'POST',headers:{...headers,Origin:'https://evil.example'},body:JSON.stringify(order())})).status,403);const sale=await fetch(base+'/api/orders',{method:'POST',headers,body:JSON.stringify(order())});assert.equal(sale.status,201);assert.equal((await sale.json()).total,1180);});
