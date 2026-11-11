@@ -3,6 +3,7 @@ import { readFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openStore, fail } from './lib/store.js';
+import { bootstrapDemo } from './lib/bootstrap.js';
 
 const root=path.join(path.dirname(fileURLToPath(import.meta.url)),'public');
 export function createApp(store) {
@@ -70,6 +71,13 @@ export function createApp(store) {
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const data=path.resolve(process.env.DATA_DIR||'data');await mkdir(data,{recursive:true});
   const store=openStore(path.join(data,'ember.sqlite'));
+  try {
+    if (bootstrapDemo(store)) console.log('Demo restaurant initialized. Sign in using the configured account.');
+  } catch (error) {
+    store.db.close();
+    console.error('Startup setup failed:', error.message);
+    process.exit(1);
+  }
   const server=createApp(store);server.listen(Number(process.env.PORT||3000),process.env.HOST||'127.0.0.1',()=>console.log(`Ember POS: http://localhost:${process.env.PORT||3000}`));
   for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>server.close(()=>{store.db.close();process.exit(0);}));
 }
