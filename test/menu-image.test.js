@@ -36,5 +36,9 @@ test('HTTP image upload and retrieval require authentication and return correct 
   assert.equal(created.status,201);const item=await created.json();
   const image=await fetch(base+item.image,{headers});assert.equal(image.status,200);assert.equal(image.headers.get('content-type'),'image/png');assert.equal(Buffer.from(await image.arrayBuffer()).toString('base64'),png.data);
   assert.equal((await fetch(base+item.image)).status,401);
+  const updated=await fetch(base+'/api/menu/'+item.id,{method:'PATCH',headers,body:JSON.stringify({...product,name:'Updated Biryani'})});
+  assert.equal(updated.status,200);assert.equal((await updated.json()).name,'Updated Biryani');
+  const deleted=await fetch(base+'/api/menu/'+item.id,{method:'DELETE',headers,body:'{}'});assert.equal(deleted.status,200);
+  const menu=await (await fetch(base+'/api/menu',{headers})).json();assert.ok(!menu.some(p=>p.id===item.id));
   assert.equal((await fetch(base+'/api/menu',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(product)})).status,401);
 });

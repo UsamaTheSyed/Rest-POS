@@ -22,7 +22,7 @@ export function createApp(store) {
           if(!(req.headers['content-type']||'').startsWith('application/json'))fail('JSON content type required',415);
         }
         const token=req.headers.cookie?.split(';').map(x=>x.trim()).find(x=>x.startsWith('ember_session='))?.slice(14)||'';
-        const menuUpload=route==='/api/menu'&&req.method==='POST';
+        const menuUpload=(route==='/api/menu'&&req.method==='POST')||(/^\/api\/menu\/\d+$/.test(route)&&req.method==='PATCH');
         if(menuUpload){const uploader=store.session(token);if(!uploader)fail('Please sign in',401);if(uploader.role!=='owner')fail('Owner access required',403);}
         let input={};
         if(write){const limit=menuUpload?3*1024*1024:65536;let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>limit)fail('Request too large',413);chunks.push(chunk);}try{input=JSON.parse(Buffer.concat(chunks).toString('utf8')||'{}');}catch{fail('Invalid JSON');}if(!input||Array.isArray(input)||typeof input!=='object')fail('Invalid request');}
@@ -60,6 +60,7 @@ export function createApp(store) {
         if(status&&req.method==='PATCH')return json(200,store.status(user,Number(status[1]),input.status));
         const product=route.match(/^\/api\/menu\/(\d+)$/);
         if(product&&req.method==='PATCH')return json(200,store.updateProduct(user,Number(product[1]),input));
+        if(product&&req.method==='DELETE')return json(200,store.deleteProduct(user,Number(product[1])));
         if(route==='/api/staff'&&req.method==='GET')return json(200,store.users(user));
         if(route==='/api/staff'&&req.method==='POST')return json(201,store.addUser(user,input));
         if(route==='/api/settings'&&req.method==='PATCH')return json(200,store.settings(user,input));
