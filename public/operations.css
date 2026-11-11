@@ -5,3 +5,62 @@
 .menu-image-preview{margin-top:12px;display:flex;gap:12px;align-items:center}.menu-image-preview[hidden]{display:none}.menu-image-preview img{width:140px;height:105px;object-fit:cover;border-radius:8px;border:1px solid #ddd}.menu-create .image-help{font-size:12px;color:#777;margin-top:8px}#image-error{color:#aa3827;font-size:12px;margin-top:8px}.menu-thumbnail{width:44px;height:44px;object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:10px}
 
 .menu-row-actions,.menu-form-actions{display:flex;gap:8px;align-items:center}.ops .danger-button{background:#fff0eb;color:#b33d28}.menu-form-actions [hidden]{display:none}.menu-row-actions button{white-space:nowrap}
+
+/* Match management and kitchen screens to the cashier type scale. */
+@media screen {
+  .auth-card { max-width: 510px; }
+  .auth-card h1 { font-size: 30px; line-height: 1.3; }
+  .auth-card p { font-size: 16px; color: #626976; }
+  .auth-card label, .ops-form label { font-size: 15px; line-height: 1.5; gap: 9px; }
+  .auth-card input, .ops input, .ops select { font-size: 16px; min-height: 48px; border-color: #cdd2db; padding: 12px 14px; }
+  .auth-card .help { font-size: 14px; }
+  #auth-error { font-size: 14px; }
+  .ops-nav { flex-wrap: wrap; gap: 12px 22px; }
+  .ops-nav a:not(.board-logo) { font-size: 15px; min-height: 44px; display: inline-flex; align-items: center; }
+  .ops-nav .user-info { font-size: 14px; color: #626976; }
+  .ops button, .ops .action-link { font-size: 15px; min-height: 44px; padding: 11px 16px; background: var(--orange); }
+  .ops .muted-button { background: #edf0f4; color: #45505e; }
+  .ops .danger-button { background: #fff0eb; color: #a32f1b; }
+  .ops h1 { font-size: 32px; line-height: 1.3; }
+  .ops h2 { font-size: 23px; line-height: 1.4; }
+  .ops .subtitle { font-size: 15px; color: #626976; line-height: 1.6; }
+  .ops-tabs button { background: white; color: #4b5563; }
+  .ops-tabs .active { background: #242c26; color: white; }
+  .ops-tabs { align-items: center; }
+  .ops-status { font-size: 13px; color: #626976; }
+  .ops table { font-size: 15px; line-height: 1.5; }
+  .ops th { font-size: 12px; color: #59616d; letter-spacing: .6px; background: #f8f9fb; }
+  .ops td, .ops th { padding: 16px 14px; }
+  .ops td:first-child { font-weight: 600; }
+  .ops td { overflow-wrap: anywhere; }
+  .ops tbody tr:hover { background: #fcf8f4; }
+  .ops-form { max-width: 640px; }
+  .menu-create { max-width: 780px; padding: 28px; border-color: #dde1e8; }
+  .menu-create label { margin-top: 20px; }
+  .ops input[type=checkbox] { min-height: 24px; width: 24px; height: 24px; accent-color: var(--orange); flex-shrink: 0; }
+  .menu-create .availability-label { min-height: 44px; }
+  .menu-create .image-help, #image-error, .menu-create #menu-feedback { font-size: 14px; line-height: 1.5; }
+  .menu-thumbnail { width: 56px; height: 56px; margin-right: 14px; }
+  .menu-form-actions, .menu-admin-heading { flex-wrap: wrap; }
+  .menu-row-actions { gap: 8px; }
+  .menu-image-preview { flex-wrap: wrap; }
+  .menu-image-preview img { width: 180px; height: 135px; }
+  .kitchen-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+  .ticket-head { font-size: 17px; flex-wrap: wrap; gap: 10px; }
+  .ticket-head span { font-size: 14px; font-weight: 600; text-transform: capitalize; }
+  .ticket-body ul { font-size: 20px; line-height: 1.6; }
+  .ticket-body li { padding: 8px 0; border-bottom: 1px solid #edf0f4; overflow-wrap: anywhere; }
+  .ticket-body p { font-size: 15px; color: #626976; line-height: 1.5; }
+  .ticket button { min-height: 52px; font-size: 16px; }
+  .ops-error { font-size: 15px; }
+}
+@media screen and (max-width: 700px) {
+  .ops { padding: 16px; }
+  .ops-panel { padding: 16px; }
+  .ops-nav { padding: 16px; }
+  .ops-nav .user-info { width: 100%; }
+  .ops-status { margin-left: 0; width: 100%; }
+  .menu-create { padding: 18px; }
+  .auth-shell { padding: 20px; }
+  .auth-card { padding: 28px 22px; }
+}
