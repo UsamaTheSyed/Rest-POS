@@ -11,7 +11,7 @@ export function createApp(store) {
   return http.createServer(async(req,res)=>{
     const json=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(value));};
     res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','same-origin');
-    res.setHeader('Content-Security-Policy',"default-src 'self'; img-src 'self' https://images.unsplash.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+    res.setHeader('Content-Security-Policy',"default-src 'self'; img-src 'self' blob: https://images.unsplash.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     try{
       const url=new URL(req.url,'http://localhost'), route=url.pathname;
       if(route.startsWith('/api/')){
@@ -21,9 +21,11 @@ export function createApp(store) {
           if(req.headers.origin && new URL(req.headers.origin).host!==req.headers.host)fail('Origin mismatch',403);
           if(!(req.headers['content-type']||'').startsWith('application/json'))fail('JSON content type required',415);
         }
-        let input={};
-        if(write){let body='';for await(const chunk of req){body+=chunk;if(Buffer.byteLength(body)>65536)fail('Request too large',413);}try{input=JSON.parse(body||'{}');}catch{fail('Invalid JSON');}if(!input||Array.isArray(input)||typeof input!=='object')fail('Invalid request');}
         const token=req.headers.cookie?.split(';').map(x=>x.trim()).find(x=>x.startsWith('ember_session='))?.slice(14)||'';
+        const menuUpload=route==='/api/menu'&&req.method==='POST';
+        if(menuUpload){const uploader=store.session(token);if(!uploader)fail('Please sign in',401);if(uploader.role!=='owner')fail('Owner access required',403);}
+        let input={};
+        if(write){const limit=menuUpload?3*1024*1024:65536;let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>limit)fail('Request too large',413);chunks.push(chunk);}try{input=JSON.parse(Buffer.concat(chunks).toString('utf8')||'{}');}catch{fail('Invalid JSON');}if(!input||Array.isArray(input)||typeof input!=='object')fail('Invalid request');}
         const cookie=t=>res.setHeader('Set-Cookie',`ember_session=${t}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${t?43200:0}${process.env.COOKIE_SECURE==='1'?'; Secure':''}`);
         if(route==='/api/setup'&&req.method==='GET')return json(200,{required:store.needsSetup()});
         if(route==='/api/setup'&&req.method==='POST'){
@@ -39,6 +41,12 @@ export function createApp(store) {
           const session=store.login(input);attempts.delete(key);cookie(session.token);return json(200,{user:session.user});
         }
         const user=store.session(token);if(!user)fail('Please sign in',401);
+        const imageRoute=route.match(/^\/api\/menu-images\/([a-f0-9-]{36})$/);
+        if(imageRoute&&['GET','HEAD'].includes(req.method)){
+          const image=store.menuImage(user,imageRoute[1]);
+          res.writeHead(200,{'Content-Type':image.content_type,'Content-Length':image.bytes.length,'Cache-Control':'private, no-store'});
+          res.end(req.method==='HEAD'?undefined:Buffer.from(image.bytes));return;
+        }
         if(route==='/api/logout'&&req.method==='POST'){store.logout(token);cookie('');return json(200,{ok:true});}
         if(route==='/api/me'&&req.method==='GET')return json(200,{user,restaurant:store.restaurant(user)});
         if(route==='/api/menu'&&req.method==='GET')return json(200,store.menu(user));

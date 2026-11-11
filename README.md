@@ -12,7 +12,7 @@ Open http://localhost:3000 and create the restaurant owner account from the serv
 
 ## Menu and orders
 
-Sign in as owner, click **Manage menu** (or **Operations → Menu**), and complete **Add menu item**. Enter the item name, choose or type a category, enter the PKR price, optionally add a description and badge, then select availability and submit. Use the Deals category for combos. New dishes use a local neutral illustration. Owners can also change prices and availability in the menu table.
+Sign in as owner, click **Manage menu** (or **Operations → Menu**), and complete **Add menu item**. Enter the item name, choose or type a category, enter the PKR price, optionally add a description and badge, then select availability and submit. Use the Deals category for combos. Optionally upload a JPG, PNG or WebP image up to 2 MB and review its preview before saving. Photos are stored in SQLite with the menu and appear in the POS, cart, and digital menu board. New dishes without photos use a local neutral illustration. Uploaded images on Render Free are temporary and are lost with the ephemeral database. Owners can also change prices and availability in the menu table.
 
 Cashiers can type whole quantities from 1–999, use the plus/minus buttons, or click **Remove** on an unsubmitted order line. Enter or leaving the quantity box applies the value and updates totals. These controls do not void finalized sales.
 
