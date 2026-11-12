@@ -156,3 +156,14 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }
+
+.pay-now {background:#fff;color:#a83d17;border:1px solid #dba38c;margin-top:10px}
+.order-filters {display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.order-filters button,.collect-payment {min-height:44px;padding:10px 16px;border-radius:7px;background:#fff;border:1px solid #d8dce2;font-size:15px}
+.order-filters .selected,.collect-payment {background:var(--orange);color:#fff;border-color:var(--orange)}
+.orders-due {font-size:17px;margin-bottom:18px;color:#555e69}
+.unpaid {display:inline-block;background:#fff0d5;color:#874509;border-radius:5px;padding:7px 10px;font-size:13px;font-weight:600}
+.order-description {flex:1;min-width:160px}
+.order-payment {display:flex;gap:9px;flex-wrap:wrap;align-items:center;justify-content:flex-end;max-width:380px}
+.kitchen-state {font-size:13px;color:#606977;text-transform:capitalize}
+@media(max-width:600px){.order-payment{justify-content:flex-start;max-width:none}.order-payment .collect-payment{width:100%}}

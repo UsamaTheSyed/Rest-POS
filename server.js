@@ -56,6 +56,8 @@ export function createApp(store) {
         if(route==='/api/order-request'&&req.method==='GET')return json(200,{order:store.orderByKey(user,url.searchParams.get('key')||'')});
         const order=route.match(/^\/api\/orders\/(\d+)$/);
         if(order&&req.method==='GET')return json(200,store.getOrder(user,Number(order[1])));
+        const payment=route.match(/^\/api\/orders\/(\d+)\/payment$/);
+        if(payment&&req.method==='POST')return json(200,store.collectPayment(user,Number(payment[1]),input));
         const status=route.match(/^\/api\/orders\/(\d+)\/status$/);
         if(status&&req.method==='PATCH')return json(200,store.status(user,Number(status[1]),input.status));
         const product=route.match(/^\/api\/menu\/(\d+)$/);

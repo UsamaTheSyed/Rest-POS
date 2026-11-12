@@ -38,3 +38,12 @@ Owners can open **Operations > Inventory** to add stock items with units and low
 **Attendance** is available to every signed-in user from the POS header. Staff see and clock only their own profile; owners can clock the team, including employees without logins. One open session per employee is enforced. Owners must clock someone out before deactivating their profile. Reports filter up to 93 days, clip overnight sessions to Pakistan date boundaries, show gross elapsed time, and export CSV. They do not calculate breaks, payroll, lateness, absence, leave or scheduled shifts. Existing records are not retroactively editable through this UI.
 
 Inventory, employee and attendance records use the same SQLite database. On Render Free, these records are temporary and are lost if the database is cleared. Browser visual verification of these new modules is pending; automated tests cover API permissions, precision, duplicate stock requests and attendance transitions/date boundaries.
+
+
+## Order now, pay later
+
+All service types (dine-in, takeaway and delivery) support **Send to kitchen · Pay later**. Confirming places an unpaid order in the kitchen immediately. Later, open **Orders > Unpaid**, identify the table/customer or order number, select **Collect payment**, choose cash or external card, and confirm receipt of the full amount. **Pay now** remains available when placing a new order.
+
+Kitchen status and payment status are independent: an order can be prepared, ready or served while still unpaid. Settling it updates the same order and never creates another kitchen ticket. Prices and tax stay as recorded at placement. Unpaid orders remain accessible even after more than 200 subsequent orders. Print bill labels unpaid orders clearly; paid orders show the payment method and time. Reports include collected payments grouped by payment date in Pakistan time, excluding unpaid bills. Existing paid records migrate automatically without being reset to unpaid.
+
+Payments remain manually recorded, not processed by a gateway. Partial payments, refunds and adding items to an already-submitted order are not part of this workflow. Automated tests cover all service types, duplicate payment attempts, migration, report timing and permissions; browser visual verification of this workflow is pending.
