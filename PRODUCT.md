@@ -20,7 +20,7 @@ Sell a restaurant POS subscription in Pakistan, with cloud management and contin
 | Module | Required behavior before sale | Current state |
 |---|---|---|
 | Restaurant onboarding | Branding, location, currency, province, fiscal registration, tax profile, menu import, opening balances | Owner setup and restaurant name only |
-| Staff | Granular roles, account disable/reset, manager approvals, individual sessions, audited sensitive operations | Owner/cashier/kitchen access and account creation |
+| Staff | Granular roles, account disable/reset, manager approvals, individual sessions, audited sensitive operations | Owner/cashier/kitchen access, account creation, employee profiles, clock-in/out and attendance CSV |
 | Catalog | Categories, sizes, modifiers, optional extras, recipes, availability, item images, combo definitions and scheduled deals | Item creation with custom categories, price and availability edits |
 | Counter POS | Fast touch/keyboard entry, held orders, notes, cash change, split tender, discounts with approvals, delivery details | Basic paid orders and notes |
 | Table service | Floor plan, open checks, waiter assignment, course firing, table transfer/merge and split bills | Table reference only |
@@ -29,7 +29,7 @@ Sell a restaurant POS subscription in Pakistan, with cloud management and contin
 | Receipts | Configurable 80/58mm layouts, kitchen tickets, fiscal receipt references, direct printer adapters, durable print queue and reprint audit | Browser-print internal receipt |
 | Voids/refunds | Manager approval, original-sale link, reason codes, partial/full refund, append-only ledger, correct tax adjustment | Not implemented |
 | Shifts | Opening float, cash in/out, drawer counts, expected vs actual, variance approvals and shift closing | Not implemented |
-| Inventory | Ingredient units, recipes/modifiers, stock movements, wastage, counts, low stock and cost snapshots | Not implemented |
+| Inventory | Ingredient units, recipes/modifiers, stock movements, wastage, counts, low stock and cost snapshots | Manual stock ledger, units, usage/wastage, counts and low-stock thresholds; recipes and costing pending |
 | Purchasing | Suppliers, purchase orders, goods receipt, supplier returns, costs and payable tracking | Not implemented |
 | Customers | Optional profile, consent, loyalty ledger, discounts and customer history | Customer reference only |
 | Reporting | Sales by payment/item/category/staff/shift, cost of goods, profit, refunds, cash reconciliation, CSV export | Daily gross recorded sales in Pakistan time |

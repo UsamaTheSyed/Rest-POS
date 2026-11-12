@@ -27,3 +27,14 @@ This is **not yet a commercial release**. The agreed target is a Pakistan-focuse
 Runtime configuration: `PORT` (3000), `HOST` (127.0.0.1), `DATA_DIR` (`data`), `COOKIE_SECURE` (`1` behind HTTPS). Keep the service on loopback during development. Production LAN/cloud deployment needs HTTPS and hardened service management. Complete initial setup before exposing the service through a proxy. Do not publish the database or copy a live SQLite main file without accounting for its WAL; use a consistent backup procedure.
 
 Run `npm test` for calculation, persistence, authorization, menu creation, quantity validation, order idempotency, tenant scoping and HTTP tests. Payable amounts are computed on the server in integer paisa. The original pure model calculation remains only as a prototype regression test.
+
+
+## Inventory, staffing and attendance
+
+Owners can open **Operations > Inventory** to add stock items with units and low-stock thresholds. Receive stock, record usage/wastage, or enter a physical count with a reason. History records the staff member, change and balance; physical counts reject stale balances and repeated movement requests do not apply twice. Stock is manually maintained; sales do not yet consume ingredient recipes.
+
+**Operations > Staffing** maintains names, job titles, optional phone numbers and active status for employees, including workers without a POS login. Existing POS accounts receive linked employee profiles automatically. **Staff accounts** still manages sign-in creation separately; marking a profile inactive does not revoke its POS login.
+
+**Attendance** is available to every signed-in user from the POS header. Staff see and clock only their own profile; owners can clock the team, including employees without logins. One open session per employee is enforced. Owners must clock someone out before deactivating their profile. Reports filter up to 93 days, clip overnight sessions to Pakistan date boundaries, show gross elapsed time, and export CSV. They do not calculate breaks, payroll, lateness, absence, leave or scheduled shifts. Existing records are not retroactively editable through this UI.
+
+Inventory, employee and attendance records use the same SQLite database. On Render Free, these records are temporary and are lost if the database is cleared. Browser visual verification of these new modules is pending; automated tests cover API permissions, precision, duplicate stock requests and attendance transitions/date boundaries.
