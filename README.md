@@ -46,4 +46,10 @@ All service types (dine-in, takeaway and delivery) support **Send to kitchen · 
 
 Kitchen status and payment status are independent: an order can be prepared, ready or served while still unpaid. Settling it updates the same order and never creates another kitchen ticket. Prices and tax stay as recorded at placement. Unpaid orders remain accessible even after more than 200 subsequent orders. Print bill labels unpaid orders clearly; paid orders show the payment method and time. Reports include collected payments grouped by payment date in Pakistan time, excluding unpaid bills. Existing paid records migrate automatically without being reset to unpaid.
 
-Payments remain manually recorded, not processed by a gateway. Partial payments, refunds and adding items to an already-submitted order are not part of this workflow. Automated tests cover all service types, duplicate payment attempts, migration, report timing and permissions; browser visual verification of this workflow is pending.
+Payments remain manually recorded, not processed by a gateway. Partial payments and refunds are not part of this workflow. Automated tests cover all service types, duplicate payment attempts, migration, report timing and permissions; browser visual verification of this workflow is pending.
+
+### Edit an unpaid order
+
+Open **Orders & payments → Unpaid → Collect payment → Edit order**. Add or remove items, type quantities, and change the table/customer or kitchen note, then choose **Save and return to payment**. This works for dine-in, takeaway and delivery. Existing items keep their original prices and the order retains its tax rate; added items use current menu prices. At least one item must remain.
+
+Item or note changes return the same ticket to the kitchen queue with a change summary. Communicate changes to staff if preparation has started. Edits are audited, paid orders cannot be edited, and stale payment or kitchen actions are rejected until refreshed. Automated coverage includes edits, permissions, price preservation, concurrent revisions and settlement; browser visual verification remains pending.

@@ -1,3 +1,4 @@
+import {editUnpaidOrder} from './order-editor.js';
 import {menuImageUrl} from './menu-image.js';
 import {money} from './model.js';
 import {parseQuantity,MAX_QUANTITY} from './cart.js';
@@ -70,13 +71,14 @@ async function collectPayment(id){
   let order;try{order=await api('/orders/'+id);}catch(e){toast(e.message);return;}
   if(order.paymentStatus==='paid'){toast('This order has already been paid.');await reloadOrders();return;}
   const dialog=document.querySelector('#checkout');let busy=false;
-  dialog.innerHTML=`<button class="close" aria-label="Close payment">×</button><div class="eyebrow">COLLECT PAYMENT · ORDER #${order.id}</div><h2>Settle the bill</h2><p>${escape(order.type)}${order.customer?' · '+escape(order.customer):''}</p><p>${order.items.map(p=>`${p.qty} × ${escape(p.name)}`).join(', ')}</p><div class="checkout-total">${money(order.total)}</div><label>Payment method<select id="payment"><option>Cash</option><option>Card (external terminal)</option></select></label><p class="payment-help">Confirm after receiving the full amount. This settles the existing order without sending another kitchen ticket.</p><p id="payment-error" role="alert"></p><button class="checkout" id="confirm-payment">Confirm payment received →</button>`;
+  dialog.innerHTML=`<button class="close" aria-label="Close payment">×</button><div class="eyebrow">COLLECT PAYMENT · ORDER #${order.id}</div><h2>Settle the bill</h2><button type="button" class="checkout pay-now" id="edit-payment-order">Edit order</button><p>${escape(order.type)}${order.customer?' · '+escape(order.customer):''}</p><p>${order.items.map(p=>`${p.qty} × ${escape(p.name)}`).join(', ')}</p><div class="checkout-total">${money(order.total)}</div><label>Payment method<select id="payment"><option>Cash</option><option>Card (external terminal)</option></select></label><p class="payment-help">Confirm after receiving the full amount. This settles the existing order without sending another kitchen ticket.</p><p id="payment-error" role="alert"></p><button class="checkout" id="confirm-payment">Confirm payment received →</button>`;
   dialog.oncancel=e=>{if(busy)e.preventDefault();};dialog.querySelector('.close').onclick=()=>{if(!busy)dialog.close();};
+  dialog.querySelector('#edit-payment-order').onclick=async()=>{if(busy)return;busy=true;dialog.querySelectorAll('button,select').forEach(el=>el.disabled=true);try{await editUnpaidOrder(id,async saved=>{orders=orders.map(o=>o.id===id?saved:o);render();await collectPayment(id);},()=>collectPayment(id).catch(e=>toast(e.message)));}catch(e){toast(e.message);dialog.querySelectorAll('button,select').forEach(el=>el.disabled=false);}finally{busy=false;}};
   dialog.querySelector('#confirm-payment').onclick=async()=>{
-    busy=true;const button=dialog.querySelector('#confirm-payment'),select=dialog.querySelector('#payment');button.disabled=true;select.disabled=true;dialog.querySelector('.close').disabled=true;
-    try{const paid=await api('/orders/'+id+'/payment','POST',{payment:select.value,expectedTotal:order.total});orders=orders.map(o=>o.id===id?paid:o);dialog.close();render();toast(paid.alreadyPaid?`Order #${id} was already paid.`:`Payment recorded for order #${id}.`);}
+    busy=true;dialog.querySelector('#edit-payment-order').disabled=true;const button=dialog.querySelector('#confirm-payment'),select=dialog.querySelector('#payment');button.disabled=true;select.disabled=true;dialog.querySelector('.close').disabled=true;
+    try{const paid=await api('/orders/'+id+'/payment','POST',{payment:select.value,expectedTotal:order.total,expectedRevision:order.revision});orders=orders.map(o=>o.id===id?paid:o);dialog.close();render();toast(paid.alreadyPaid?`Order #${id} was already paid.`:`Payment recorded for order #${id}.`);}
     catch(e){dialog.querySelector('#payment-error').textContent=e.message;button.disabled=false;dialog.querySelector('.close').disabled=false;if(e.status&&e.status<500)select.disabled=false;}
-    finally{busy=false;}
+    finally{busy=false;if(dialog.open)dialog.querySelector('#edit-payment-order').disabled=false;}
   };dialog.showModal();
 }
 let boardTimer;

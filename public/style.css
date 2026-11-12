@@ -167,3 +167,5 @@
 .order-payment {display:flex;gap:9px;flex-wrap:wrap;align-items:center;justify-content:flex-end;max-width:380px}
 .kitchen-state {font-size:13px;color:#606977;text-transform:capitalize}
 @media(max-width:600px){.order-payment{justify-content:flex-start;max-width:none}.order-payment .collect-payment{width:100%}}
+
+.edit-order-items{margin:20px 0;max-height:35vh;overflow:auto}.edit-order-line{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #ddd}.edit-order-line>div{flex:1;min-width:0;overflow-wrap:anywhere}.edit-order-line label{font-size:12px}.edit-order-line input{width:65px;min-height:44px;font-size:16px;border:1px solid #ccc;border-radius:5px;padding:8px}#order-edit-form>label{margin-top:16px}#order-edit-form>label input{min-height:44px;font-size:16px;padding:10px;border:1px solid #ccc;border-radius:6px}#edit-error{color:#a32f1b;margin-top:12px}
