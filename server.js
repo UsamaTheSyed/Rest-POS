@@ -1,3 +1,6 @@
+import QRCode from 'qrcode';
+import {customerOrdering} from './lib/customer-ordering.js';
+import {whatsappBot,validSignature} from './lib/whatsapp.js';
 import http from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -6,7 +9,10 @@ import { openStore, fail } from './lib/store.js';
 import { bootstrapDemo } from './lib/bootstrap.js';
 
 const root=path.join(path.dirname(fileURLToPath(import.meta.url)),'public');
-export function createApp(store) {
+export function createApp(store,config=process.env,sendFetch=fetch) {
+  const ordering=customerOrdering(store),bot=whatsappBot(store,ordering,config,sendFetch);
+  let webhookQueue=Promise.resolve();
+  const publicAttempts=new Map();
   const attempts=new Map();
   return http.createServer(async(req,res)=>{
     const json=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(value));};
@@ -14,6 +20,19 @@ export function createApp(store) {
     res.setHeader('Content-Security-Policy',"default-src 'self'; img-src 'self' blob: https://images.unsplash.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     try{
       const url=new URL(req.url,'http://localhost'), route=url.pathname;
+      if(route==='/webhooks/whatsapp'){
+        if(!bot.configured())fail('WhatsApp is not configured',503);
+        if(req.method==='GET'){
+          if(url.searchParams.get('hub.mode')!=='subscribe'||url.searchParams.get('hub.verify_token')!==config.WHATSAPP_VERIFY_TOKEN)fail('Verification failed',403);
+          res.writeHead(200,{'Content-Type':'text/plain'});return res.end(url.searchParams.get('hub.challenge')||'');
+        }
+        if(req.method!=='POST')fail('Method not allowed',405);
+        const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>262144)fail('Request too large',413);chunks.push(chunk);}const raw=Buffer.concat(chunks);
+        if(!validSignature(raw,req.headers['x-hub-signature-256'],config.WHATSAPP_APP_SECRET))fail('Invalid signature',403);
+        let payload;try{payload=JSON.parse(raw);}catch{fail('Invalid JSON');}
+        if(!payload||payload.object!=='whatsapp_business_account')fail('Invalid webhook');
+        const job=webhookQueue.then(()=>bot.receive(payload));webhookQueue=job.catch(()=>{});await job;return json(200,{ok:true});
+      }
       if(route.startsWith('/api/')){
         const write=!['GET','HEAD'].includes(req.method);
         if(write){
@@ -40,6 +59,18 @@ export function createApp(store) {
           attempt.count++;attempts.set(key,attempt);
           const session=store.login(input);attempts.delete(key);cookie(session.token);return json(200,{user:session.user});
         }
+        const customerRoute=route.match(/^\/api\/customer\/([a-f0-9]{48})(?:\/(orders|images\/([a-f0-9-]{36})))?$/);
+        if(customerRoute){
+          const tableToken=customerRoute[1];
+          if(req.method==='GET'&&!customerRoute[2])return json(200,ordering.menu(tableToken));
+          if(req.method==='GET'&&customerRoute[3]){const image=ordering.image(tableToken,customerRoute[3]);res.writeHead(200,{'Content-Type':image.content_type,'Cache-Control':'no-store'});return res.end(Buffer.from(image.bytes));}
+          if(req.method==='POST'&&customerRoute[2]==='orders'){
+            const now=Date.now();for(const [k,v] of publicAttempts)if(v.until<now)publicAttempts.delete(k);
+            const key=tableToken,attempt=publicAttempts.get(key)||{count:0,until:now+60000};if(attempt.count>=10)fail('Too many requests. Please wait a minute.',429);attempt.count++;publicAttempts.set(key,attempt);
+            return json(201,ordering.place(tableToken,input));
+          }
+          fail('Not found',404);
+        }
         const user=store.session(token);if(!user)fail('Please sign in',401);
         const imageRoute=route.match(/^\/api\/menu-images\/([a-f0-9-]{36})$/);
         if(imageRoute&&['GET','HEAD'].includes(req.method)){
@@ -47,6 +78,21 @@ export function createApp(store) {
           res.writeHead(200,{'Content-Type':image.content_type,'Content-Length':image.bytes.length,'Cache-Control':'private, no-store'});
           res.end(req.method==='HEAD'?undefined:Buffer.from(image.bytes));return;
         }
+        if(route==='/api/ordering-config'&&req.method==='GET'){ordering.tables(user);return json(200,{restaurantId:user.restaurant_id,publicBaseUrl:config.PUBLIC_BASE_URL||'',whatsappConfigured:bot.configured()&&Number(config.WHATSAPP_RESTAURANT_ID)===user.restaurant_id});}
+        if(route==='/api/customer-tables'&&req.method==='GET')return json(200,ordering.tables(user));
+        if(route==='/api/customer-tables'&&req.method==='POST')return json(201,ordering.addTable(user,input));
+        const tableRoute=route.match(/^\/api\/customer-tables\/([a-f0-9]{48})(?:\/(qr))?$/);
+        if(tableRoute&&req.method==='DELETE')return json(200,ordering.disableTable(user,tableRoute[1]));
+        if(tableRoute&&tableRoute[2]&&req.method==='GET'){
+          const table=ordering.tables(user).find(t=>t.token===tableRoute[1]&&t.enabled);if(!table)fail('Table not found',404);
+          if(!config.PUBLIC_BASE_URL)fail('Set PUBLIC_BASE_URL to your restaurant HTTPS address before printing QR codes.');
+          const base=new URL(config.PUBLIC_BASE_URL);if(!['http:','https:'].includes(base.protocol))fail('Invalid public URL');
+          const svg=await QRCode.toString(new URL('/customer.html?table='+table.token,base).href,{type:'svg',margin:4,width:360,errorCorrectionLevel:'M'});
+          res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'no-store'});return res.end(svg);
+        }
+        if(route==='/api/customer-requests'&&req.method==='GET')return json(200,ordering.requests(user));
+        const requestRoute=route.match(/^\/api\/customer-requests\/(\d+)$/);
+        if(requestRoute&&req.method==='PATCH')return json(200,ordering.decide(user,Number(requestRoute[1]),input.action));
         if(route==='/api/logout'&&req.method==='POST'){store.logout(token);cookie('');return json(200,{ok:true});}
         if(route==='/api/me'&&req.method==='GET')return json(200,{user,restaurant:store.restaurant(user)});
         if(route==='/api/menu'&&req.method==='GET')return json(200,store.menu(user));

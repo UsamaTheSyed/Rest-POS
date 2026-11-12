@@ -79,3 +79,7 @@
 .ops-form .availability-label {display:flex;align-items:center;gap:10px}
 #stock-cancel[hidden],#employee-cancel[hidden],#stock-history[hidden],#opening-stock[hidden] {display:none}
 @media(max-width:850px){.module-columns{grid-template-columns:1fr}.menu-row-actions{flex-wrap:wrap}.report-filter label{width:100%}.report-filter input{width:100%}}
+
+.qr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px}.qr-card{border:1px solid #ddd;padding:20px;border-radius:12px;text-align:center}.qr-card img{display:block;width:220px;height:220px;margin:auto;max-width:100%}
+
+@media print{.ops-nav,.ops-tabs,.ops>h1,.ops>p,#add-table,.qr-card a,.qr-card button,.print-hide,.ops-panel:has(#refresh-requests){display:none!important}.qr-grid{display:grid;grid-template-columns:1fr 1fr}.qr-card{break-inside:avoid}.ops{max-width:none;padding:0;margin:0}.qr-card img{width:220px;height:220px}}

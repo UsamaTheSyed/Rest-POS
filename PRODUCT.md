@@ -71,3 +71,7 @@ Primary references reviewed:
 - Backup restoration demonstrated on a replacement device, not merely a successful backup command.
 - Fiscal/provider sandbox acceptance followed by authorized production onboarding.
 - Restaurant owner accepts day-end reports, training material and support process during a supervised pilot.
+
+## Customer ordering implementation
+
+Table-specific QR menus and a command-based WhatsApp Cloud API bot feed staff-reviewed customer requests. Accepting a request creates an unpaid kitchen/POS order with idempotent retries. Owners manage table codes; owners and cashiers accept/reject requests. WhatsApp requires deployment secrets and Meta onboarding; live delivery is not yet verified. This version supports one WhatsApp business number per deployment, manual request refresh and customer-initiated status checks. Public table codes do not verify physical presence. Durable storage, live device tests and operational acceptance are required before commercial use.

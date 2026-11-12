@@ -1,8 +1,9 @@
+import {orderingView} from './customer-admin.js';
 import {inventoryView,teamView} from './team-stock.js';
 import {menuImageUrl,validateImageFile,readImageFile} from './menu-image.js';
 import {api,authenticate,html} from './api.js';
 import {money} from './model.js';
-const sectionNames={kitchen:'Kitchen',menu:'Menu',inventory:'Inventory',employees:'Staffing',attendance:'Attendance',staff:'Staff accounts',reports:'Reports',settings:'Settings',audit:'Audit'};
+const sectionNames={ordering:'Customer orders',kitchen:'Kitchen',menu:'Menu',inventory:'Inventory',employees:'Staffing',attendance:'Attendance',staff:'Staff accounts',reports:'Reports',settings:'Settings',audit:'Audit'};
 const requestedSection=new URLSearchParams(location.search).get('section');
 let context,section=Object.hasOwn(sectionNames,requestedSection)?requestedSection:'kitchen',poll;
 const attendanceRange={};
@@ -12,10 +13,11 @@ function clearPreview(){if(previewUrl){URL.revokeObjectURL(previewUrl);previewUr
 window.addEventListener('pagehide',clearPreview);
 const time=d=>new Date(d).toLocaleString('en-PK',{timeZone:'Asia/Karachi'});
 function alertError(e){const el=document.querySelector('#ops-error');if(el){el.textContent=e.message;el.hidden=false;}}
-async function start(){context=await authenticate();if(context.user.role==='cashier')section='attendance';if(context.user.role==='kitchen'&&!['kitchen','attendance'].includes(section))section='kitchen';shell();await load();poll=setInterval(()=>{if(section==='kitchen')load().catch(alertError);},5000);}
-function shell(){clearPreview();app.innerHTML=`<div class="ops"><nav class="ops-nav"><a class="board-logo" href="/">ember✦</a><a href="/">Point of sale</a><a href="/?display=1" target="ember-display">Menu display ↗</a><span class="user-info">${html(context.user.name)} · ${html(context.user.role)}</span><button id="logout" class="muted-button">Sign out</button></nav><h1>${html(context.restaurant.name)}</h1><p class="subtitle">Restaurant operations · Asia/Karachi · PKR</p><div class="ops-tabs">${(context.user.role==='owner'?Object.keys(sectionNames):context.user.role==='kitchen'?['kitchen','attendance']:['attendance']).map(s=>`<button data-section="${s}" class="${section===s?'active':''}">${sectionNames[s]}</button>`).join('')}<span class="ops-status" id="status"></span></div><div id="ops-error" class="ops-error" role="alert" hidden></div><div id="content"></div></div>`;document.querySelector('#logout').onclick=async()=>{await api('/logout','POST',{});location.href='/';};document.querySelectorAll('[data-section]').forEach(b=>b.onclick=()=>{section=b.dataset.section;shell();load().catch(alertError);});}
+async function start(){context=await authenticate();if(context.user.role==='cashier'&&!['ordering','attendance'].includes(section))section='ordering';if(context.user.role==='kitchen'&&!['kitchen','attendance'].includes(section))section='kitchen';shell();await load();poll=setInterval(()=>{if(section==='kitchen')load().catch(alertError);},5000);}
+function shell(){clearPreview();app.innerHTML=`<div class="ops"><nav class="ops-nav"><a class="board-logo" href="/">ember✦</a><a href="/">Point of sale</a><a href="/?display=1" target="ember-display">Menu display ↗</a><span class="user-info">${html(context.user.name)} · ${html(context.user.role)}</span><button id="logout" class="muted-button">Sign out</button></nav><h1>${html(context.restaurant.name)}</h1><p class="subtitle">Restaurant operations · Asia/Karachi · PKR</p><div class="ops-tabs">${(context.user.role==='owner'?Object.keys(sectionNames):context.user.role==='kitchen'?['kitchen','attendance']:['ordering','attendance']).map(s=>`<button data-section="${s}" class="${section===s?'active':''}">${sectionNames[s]}</button>`).join('')}<span class="ops-status" id="status"></span></div><div id="ops-error" class="ops-error" role="alert" hidden></div><div id="content"></div></div>`;document.querySelector('#logout').onclick=async()=>{await api('/logout','POST',{});location.href='/';};document.querySelectorAll('[data-section]').forEach(b=>b.onclick=()=>{section=b.dataset.section;shell();load().catch(alertError);});}
 async function load(){const selected=section;let markup='',menuRows=[],moduleView=null;
   const reloadModule=async()=>{if(section===selected)await load();};
+  if(section==='ordering')moduleView=await orderingView(context,reloadModule,alertError);
   if(section==='inventory')moduleView=await inventoryView(reloadModule,alertError);
   if(['employees','attendance'].includes(section))moduleView=await teamView(context,section==='attendance',reloadModule,alertError,attendanceRange);
   if(moduleView)markup=moduleView.markup;

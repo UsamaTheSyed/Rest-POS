@@ -5,6 +5,7 @@ A restaurant branch-service foundation with cashier, kitchen and management scre
 ## Run
 
 ```sh
+npm ci
 npm start
 ```
 
@@ -53,3 +54,49 @@ Payments remain manually recorded, not processed by a gateway. Partial payments 
 Open **Orders & payments → Unpaid → Collect payment → Edit order**. Add or remove items, type quantities, and change the table/customer or kitchen note, then choose **Save and return to payment**. This works for dine-in, takeaway and delivery. Existing items keep their original prices and the order retains its tax rate; added items use current menu prices. At least one item must remain.
 
 Item or note changes return the same ticket to the kitchen queue with a change summary. Communicate changes to staff if preparation has started. Edits are audited, paid orders cannot be edited, and stale payment or kitchen actions are rejected until refreshed. Automated coverage includes edits, permissions, price preservation, concurrent revisions and settlement; browser visual verification remains pending.
+
+## Customer table ordering and WhatsApp bot
+
+Install dependencies with `npm ci` before starting. Render **Build Command** must now be `npm ci`; **Start Command** stays `npm start`.
+
+### Table QR ordering
+
+1. Set `PUBLIC_BASE_URL` in Render to the full deployed HTTPS URL (for example `https://your-pos.onrender.com`), then redeploy.
+2. Open **Operations → Customer orders** as owner. Create a table with a label such as **Table 04**.
+3. Use **Print table cards**, or open its QR image. Test each printed code on a phone before placing it on the table.
+4. Customers scan without signing in, select quantities, add notes, and send a request. The table is assigned by the server; customers cannot select another table by editing the submitted JSON.
+5. Owners/cashiers open **Customer orders**, click **Refresh requests**, verify the request and **Accept and send to kitchen** or **Reject**. Acceptance creates one unpaid POS order. Collect payment through the existing POS flow later.
+
+A table link is shareable, not proof that the customer is physically present. Staff acceptance is required. Disable a code to invalidate printed/shared copies. Public menus expose only available products and their restaurant's images, not staff accounts or other orders. Requests have a rate limit and a pending-queue limit. Public request retries and staff acceptance are idempotent. If prices or availability change before acceptance, reject the request and ask the customer to resubmit with the updated menu.
+
+### Automated WhatsApp bot setup
+
+This is a command-based Cloud API bot, not an AI/free-text assistant or a wa.me link. One business phone number is mapped to one restaurant per deployment. No live Meta account is configured by the code change.
+
+Configure these variables privately in Render (never commit tokens):
+
+| Variable | Value |
+| --- | --- |
+| `WHATSAPP_RESTAURANT_ID` | Restaurant ID shown in **Customer orders** |
+| `WHATSAPP_PHONE_NUMBER_ID` | Meta Cloud API business phone number ID, not the phone number itself |
+| `WHATSAPP_ACCESS_TOKEN` | Valid server-side access token authorized to send messages for that phone number |
+| `WHATSAPP_APP_SECRET` | Meta app secret used to verify webhook signatures |
+| `WHATSAPP_VERIFY_TOKEN` | A long random secret you choose and enter identically in Meta webhook setup |
+| `WHATSAPP_API_VERSION` | Supported Graph API version selected for your Meta app, in `vNN.N` format |
+
+In your Meta app's WhatsApp configuration, set the HTTPS callback to `https://YOUR-HOST/webhooks/whatsapp`, use your verification token, and subscribe to **messages** events. Follow Meta's account and phone-number onboarding requirements. The endpoint verifies the challenge and checks signed event bodies before processing them. Setup reference: [Meta's webhook verification documentation](https://whatsapp.github.io/WhatsApp-Nodejs-SDK/api-reference/webhooks/start/).
+
+Test with the allowed recipient/test number in your Meta account before enabling your business number:
+
+```text
+MENU
+ORDER 1x2, 3x1 | Delivery | Ali | Full delivery address
+CONFIRM
+STATUS 1
+```
+
+Use actual item IDs returned by `MENU`. `MENU 2` shows the next page. Use `Takeaway` for pickup, or `Dine-in` and include the table in the last field. The bot quotes the total including tax; `CONFIRM` submits a staff-review request, and `CANCEL` clears the draft. Drafts expire after 30 minutes. `STATUS <request number>` checks acceptance only for requests belonging to that sender. Accepted requests become unpaid POS orders; staff can edit and collect payment as usual. Rejection/acceptance notifications are not pushed automatically: customers use STATUS or contact staff.
+
+Inbound message IDs and replies are stored for retry handling. A failed Meta send returns an error so webhook delivery can retry without duplicating the order request. In the rare case Meta accepts a reply but the network loses the response, a reply may appear twice; the order request remains deduplicated. No outgoing promotional/template messages, payment collection, natural-language interpretation, or multiple WhatsApp business-number routing is implemented.
+
+**Review-demo limitation:** the existing Render Free `/tmp` database is ephemeral. A reset loses table links, requests, message deduplication, and orders; old printed QR codes stop working. Use durable storage before using this with real restaurant customers. The automated tests cover the local API and mocked Meta delivery; actual phone scanning and live Meta delivery still need verification. Browser automation timed out during this change.
