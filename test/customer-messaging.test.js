@@ -64,3 +64,28 @@ test('HTTP tracking is public but notifications and conversations require author
  assert.equal((await fetch(base+'/api/notifications')).status,401);assert.equal((await fetch(base+'/api/conversations')).status,401);
  const response=await fetch(base+'/api/tracking/order/'+o.trackingToken);assert.equal(response.status,200);const tracking=await response.json();assert.equal(tracking.customerPhone,undefined);assert.equal(tracking.status,'Order accepted');
 });
+
+
+test('natural-language handoff requests pause the bot without repeatedly sending menus or resetting active staff chat',async t=>{
+ const {store,owner,messaging,bot,sent}=fixture(t);
+ const phrases=['Connect with agent','Connect me to an agent','Please connect me with a person!','I want to talk to someone','Can I speak to a staff member?','HUMAN'];
+ for(let i=0;i<phrases.length;i++){
+  const phone='9230012345'+String(i).padStart(2,'0');
+  await bot.receive(event('natural-'+i,phrases[i],phone));
+  assert.match(sent.at(-1).text.body,/notified restaurant staff/);assert.doesNotMatch(sent.at(-1).text.body,/Menu \(PKR/);
+  const thread=messaging.inbox(owner).threads.find(t=>t.phone===phone);assert.equal(thread.mode,'waiting');
+  messaging.reply(owner,thread.id,{message:'A staff member is here.',requestKey:'hello-'+i});
+  const count=sent.length;await bot.receive(event('repeat-'+i,phrases[i],phone));await bot.receive(event('followup-'+i,'Are you there?',phone));
+  assert.equal(sent.length,count);assert.equal(messaging.conversation(owner,thread.id).mode,'active');
+ }
+});
+
+test('unknown messages get concise help, only explicit MENU sends the menu, and webhook/status retries do not resend it',async t=>{
+ const {bot,sent}=fixture(t);
+ await bot.receive(event('greeting','Hi'));assert.doesNotMatch(sent.at(-1).text.body,/Menu \(PKR/);
+ await bot.receive(event('unknown','How long will it take?'));assert.match(sent.at(-1).text.body,/did not understand/);assert.doesNotMatch(sent.at(-1).text.body,/Menu \(PKR/);
+ await bot.receive(event('explicit-menu','MENU'));assert.match(sent.at(-1).text.body,/Menu \(PKR/);
+ const count=sent.length;await bot.receive(event('explicit-menu','MENU'));assert.equal(sent.length,count);
+ await bot.receive({entry:[{changes:[{value:{metadata:{phone_number_id:'123'},statuses:[{id:'unrelated',status:'delivered'}]}}]}]});assert.equal(sent.length,count);
+ await bot.receive(event('invalid-page','MENU 999'));assert.match(sent.at(-1).text.body,/valid page number/);
+});
