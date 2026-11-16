@@ -159,3 +159,12 @@ Data use: enabling this feature sends the current customer text, a limited menu 
 Explicit MENU, HUMAN, CONFIRM, CANCEL, STOP, UPDATES and structured ORDER commands bypass the model. Active human conversations never reach it. Requests time out after 6 seconds; malformed results, unavailable models, quotas and provider failures fall back to local commands. Interpretations are cached by inbound message ID to avoid duplicate calls when a webhook retries. Each phone is limited to eight interpretation attempts per minute; the optional daily cap is separate from Google's quota. The menu context is limited to the first 150 available items and each interpreted order to 20 distinct items. Unknown or ambiguous dishes require clarification; special preparation/allergy requests are directed to staff by the interpreter instructions and need human verification. This is not a general-purpose AI support assistant.
 
 Set `WHATSAPP_LLM_ENABLED=0` to disable the interpreter without disabling WhatsApp. Tests mock Gemini responses and verify server-side guards, multi-turn state, handoff, fallback and idempotency. Actual Roman Urdu accuracy, latency and provider access must be tested with your API key; no live LLM call was made during implementation.
+
+
+### Tracking screen and POS WhatsApp shortcut
+
+The customer tracking page now includes a responsive progress timeline, service-specific stages, payment/total summary and expandable activity history. Waiting and declined requests have distinct messages. It retains the last received order when disconnected, labels updates as paused, and offers manual refresh alongside automatic updates. No delivery-time estimate or GPS location is invented.
+
+The POS has a floating WhatsApp shortcut for owners/cashiers. It opens **Operations → WhatsApp inbox** in a separate tab, keeping the current cart intact. Its badge counts active staff conversations (not unread messages) using the existing notification poll. The button opens the POS staff inbox, not the personal WhatsApp app, and is not shown on the customer menu display or kitchen-only screen.
+
+Validation: desktop and 390-pixel mobile tracking layouts checked in headless Chrome; no mobile horizontal overflow. The connection-loss/recovery states retain the existing order. The existing 62 automated tests pass.

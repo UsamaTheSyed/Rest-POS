@@ -106,6 +106,6 @@ async function start(){
   orders=(await api('/orders')).reverse();
   try{const draft=JSON.parse(sessionStorage.getItem('ember-cart')||'[]');cart=draft.filter(p=>menu.some(m=>m.id===p.id)&&Number.isInteger(p.qty)&&p.qty>0).map(p=>({...menu.find(m=>m.id===p.id),qty:p.qty}));}catch{}
   render();
-  if(view!=='display'){startOrderAlerts(context);window.addEventListener('customer-order-accepted',()=>reloadOrders().catch(e=>toast(e.message)));}
+  if(view!=='display'){startOrderAlerts(context,{whatsappShortcut:true});window.addEventListener('customer-order-accepted',()=>reloadOrders().catch(e=>toast(e.message)));}
   if(view==='display')setInterval(async()=>{try{const fresh=await api('/menu');const next=fresh.filter(p=>p.available);const updated=await api('/me');if(JSON.stringify(menu)!==JSON.stringify(next)||JSON.stringify(context.restaurant)!==JSON.stringify(updated.restaurant)){menu=next;context=updated;render();}}catch{}},15000);
 }
