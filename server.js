@@ -1,3 +1,4 @@
+import {languageConfig} from './lib/whatsapp-language.js';
 import {customerMessaging} from './lib/customer-messaging.js';
 import QRCode from 'qrcode';
 import {customerOrdering} from './lib/customer-ordering.js';
@@ -88,7 +89,7 @@ export function createApp(store,config=process.env,sendFetch=fetch) {
         if(conversation&&req.method==='GET'&&!conversation[2])return json(200,messaging.conversation(user,Number(conversation[1])));
         if(conversation&&req.method==='POST'&&conversation[2]==='reply')return json(200,messaging.reply(user,Number(conversation[1]),input));
         if(conversation&&req.method==='POST'&&conversation[2]==='resume')return json(200,messaging.resume(user,Number(conversation[1])));
-        if(route==='/api/ordering-config'&&req.method==='GET'){ordering.tables(user);return json(200,{restaurantId:user.restaurant_id,publicBaseUrl:config.PUBLIC_BASE_URL||'',whatsappConfigured:bot.configured()&&Number(config.WHATSAPP_RESTAURANT_ID)===user.restaurant_id});}
+        if(route==='/api/ordering-config'&&req.method==='GET'){ordering.tables(user);return json(200,{languageAssistant:languageConfig(config),restaurantId:user.restaurant_id,publicBaseUrl:config.PUBLIC_BASE_URL||'',whatsappConfigured:bot.configured()&&Number(config.WHATSAPP_RESTAURANT_ID)===user.restaurant_id});}
         if(route==='/api/customer-tables'&&req.method==='GET')return json(200,ordering.tables(user));
         if(route==='/api/customer-tables'&&req.method==='POST')return json(201,ordering.addTable(user,input));
         const tableRoute=route.match(/^\/api\/customer-tables\/([a-f0-9]{48})(?:\/(qr))?$/);

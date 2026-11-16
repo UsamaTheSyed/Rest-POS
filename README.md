@@ -71,7 +71,7 @@ A table link is shareable, not proof that the customer is physically present. St
 
 ### Automated WhatsApp bot setup
 
-This is a command-based Cloud API bot, not an AI/free-text assistant or a wa.me link. One business phone number is mapped to one restaurant per deployment. No live Meta account is configured by the code change.
+This is a Cloud API bot with local commands and optional Gemini language understanding (see below), not a wa.me link. One business phone number is mapped to one restaurant per deployment. No live Meta account is configured by the code change.
 
 Configure these variables privately in Render (never commit tokens):
 
@@ -97,7 +97,7 @@ STATUS 1
 
 Use actual item IDs returned by `MENU`. `MENU 2` shows the next page. Use `Takeaway` for pickup, or `Dine-in` and include the table in the last field. The bot quotes the total including tax; `CONFIRM` submits a staff-review request, and `CANCEL` clears the draft. Drafts expire after 30 minutes. `STATUS <request number>` checks acceptance only for requests belonging to that sender. Accepted requests become unpaid POS orders; staff can edit and collect payment as usual. Accepted takeaway/delivery orders now send progress updates when the customer has opted in and WhatsApp is configured. Customers can also use STATUS or their tracking link. Rejected requests are visible on the tracking page; staff should follow up when needed.
 
-Inbound message IDs and replies are stored for retry handling. A failed Meta send returns an error so webhook delivery can retry without duplicating the order request. In the rare case Meta accepts a reply but the network loses the response, a reply may appear twice; the order request remains deduplicated. No outgoing promotional/template messages, payment collection, natural-language interpretation, or multiple WhatsApp business-number routing is implemented.
+Inbound message IDs and replies are stored for retry handling. A failed Meta send returns an error so webhook delivery can retry without duplicating the order request. In the rare case Meta accepts a reply but the network loses the response, a reply may appear twice; the order request remains deduplicated. Promotional messages, payment processing and multiple WhatsApp business-number routing are not implemented. Order-status templates and optional language interpretation are described below.
 
 **Review-demo limitation:** the existing Render Free `/tmp` database is ephemeral. A reset loses table links, requests, message deduplication, and orders; old printed QR codes stop working. Use durable storage before using this with real restaurant customers. The automated tests cover the local API and mocked Meta delivery; actual phone scanning and live Meta delivery still need verification. Browser automation timed out during this change.
 
@@ -133,3 +133,29 @@ Use a body-only template matching those three placeholders; arbitrary template l
 Events and retry state are stored in SQLite. Sends retry up to five attempts with backoff; later updates for the same order wait behind an earlier failed update to retain sequence. Staff can retry after correcting the problem. Ambiguous network failures can still result in a duplicate WhatsApp message, but cannot duplicate the POS order. The worker runs every 5 seconds while the server is running, and is intended for one server process per database. The existing Render Free ephemeral-storage limitation still applies to events and conversations, and sleeping servers cannot deliver updates until they wake.
 
 Validation: 52 automated tests pass, including delivery sequencing, human handoff, tenant permissions, opt-in/STOP, reply windows/templates, retry handling, provider status receipts and public tracking privacy. Native browser verification was attempted but the computer-use tool could not reliably identify the browser URL and stopped. Live Meta delivery remains unverified until the restaurant connects its WhatsApp account.
+
+
+## Optional English and Roman Urdu language understanding
+
+The WhatsApp bot can use **Gemini 3.5 Flash-Lite** to interpret text such as `menu dikhao`, `kisi banday se baat karni hai`, and `mujhe do classic smash chahiye`. It can collect missing order details over several messages. It uses a validated structured interpretation, not a model-written customer reply. The POS supplies menu prices, computes totals, checks availability, and asks for literal **CONFIRM** before creating a staff-review request. Natural-language confirmations such as `haan theek hai` prompt the customer to review the bill and type CONFIRM; they never submit automatically. Submitted orders still require staff acceptance.
+
+Google currently lists a free API tier for Gemini 3.5 Flash-Lite. Availability and quotas depend on the project/account and can change; this is not unlimited free production hosting. Use a project eligible for the free tier and check its billing/quota settings. The app does not enable paid billing or switch to a paid fallback. A billed API key may incur charges even though the selected model has a free tier. Sources: [Google pricing](https://ai.google.dev/gemini-api/docs/pricing#gemini-3.5-flash-lite), [model documentation](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite).
+
+1. Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/apikey). Keep it private.
+2. Add these Render environment variables, then save and deploy:
+
+| Variable | Value |
+| --- | --- |
+| `WHATSAPP_LLM_ENABLED` | `1` |
+| `GEMINI_API_KEY` | Your private Google AI Studio API key |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` |
+| `WHATSAPP_LLM_DAILY_LIMIT` | `100` (optional local cap; default 100 calls per restaurant per UTC day) |
+
+3. **Operations → Customer orders** displays `English / Roman Urdu assistant: Gemini configured (live test required)`. This indicates settings are present, not that the key has been verified.
+4. Test `menu dikhao`, then `mujhe do classic smash chahiye` (use an actual menu item). Reply to the service/name/address questions, review the complete quote, and send CONFIRM only if correct. Test `kisi banday se baat karni hai` to verify staff handoff. Test with fictional customer details first.
+
+Data use: enabling this feature sends the current customer text, a limited menu list, and any current structured order draft to Google. Sender phone metadata, staff conversations, order history, prices and API secrets are not included in the prompt. Obvious phone numbers/emails in text are redacted, but this is **not anonymization**: customer names, addresses and other personal details can still be present. Google says free-tier inputs/outputs may be used to improve its products. Review the provider terms and your customer-data requirements before enabling it for real customers; do not send confidential or sensitive information to the free service. The welcome message discloses cloud-AI interpretation when enabled. [Google data-use terms](https://ai.google.dev/gemini-api/terms)
+
+Explicit MENU, HUMAN, CONFIRM, CANCEL, STOP, UPDATES and structured ORDER commands bypass the model. Active human conversations never reach it. Requests time out after 6 seconds; malformed results, unavailable models, quotas and provider failures fall back to local commands. Interpretations are cached by inbound message ID to avoid duplicate calls when a webhook retries. Each phone is limited to eight interpretation attempts per minute; the optional daily cap is separate from Google's quota. The menu context is limited to the first 150 available items and each interpreted order to 20 distinct items. Unknown or ambiguous dishes require clarification; special preparation/allergy requests are directed to staff by the interpreter instructions and need human verification. This is not a general-purpose AI support assistant.
+
+Set `WHATSAPP_LLM_ENABLED=0` to disable the interpreter without disabling WhatsApp. Tests mock Gemini responses and verify server-side guards, multi-turn state, handoff, fallback and idempotency. Actual Roman Urdu accuracy, latency and provider access must be tested with your API key; no live LLM call was made during implementation.
