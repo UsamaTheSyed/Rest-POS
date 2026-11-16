@@ -1,3 +1,4 @@
+import {customerMessaging} from './lib/customer-messaging.js';
 import QRCode from 'qrcode';
 import {customerOrdering} from './lib/customer-ordering.js';
 import {whatsappBot,validSignature} from './lib/whatsapp.js';
@@ -10,11 +11,11 @@ import { bootstrapDemo } from './lib/bootstrap.js';
 
 const root=path.join(path.dirname(fileURLToPath(import.meta.url)),'public');
 export function createApp(store,config=process.env,sendFetch=fetch) {
-  const ordering=customerOrdering(store),bot=whatsappBot(store,ordering,config,sendFetch);
+  const ordering=customerOrdering(store),bot=whatsappBot(store,ordering,config,sendFetch),messaging=customerMessaging(store,config,sendFetch);
   let webhookQueue=Promise.resolve();
   const publicAttempts=new Map();
   const attempts=new Map();
-  return http.createServer(async(req,res)=>{
+  const server=http.createServer(async(req,res)=>{
     const json=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(value));};
     res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','same-origin');
     res.setHeader('Content-Security-Policy',"default-src 'self'; img-src 'self' blob: https://images.unsplash.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
@@ -59,6 +60,8 @@ export function createApp(store,config=process.env,sendFetch=fetch) {
           attempt.count++;attempts.set(key,attempt);
           const session=store.login(input);attempts.delete(key);cookie(session.token);return json(200,{user:session.user});
         }
+        const trackingRoute=route.match(/^\/api\/tracking\/(order|request)\/([a-f0-9]{48})$/);
+        if(trackingRoute&&req.method==='GET')return json(200,trackingRoute[1]==='order'?messaging.tracking(trackingRoute[2]):ordering.tracking(trackingRoute[2]));
         const customerRoute=route.match(/^\/api\/customer\/([a-f0-9]{48})(?:\/(orders|images\/([a-f0-9-]{36})))?$/);
         if(customerRoute){
           const tableToken=customerRoute[1];
@@ -78,6 +81,13 @@ export function createApp(store,config=process.env,sendFetch=fetch) {
           res.writeHead(200,{'Content-Type':image.content_type,'Content-Length':image.bytes.length,'Cache-Control':'private, no-store'});
           res.end(req.method==='HEAD'?undefined:Buffer.from(image.bytes));return;
         }
+        if(route==='/api/notifications'&&req.method==='GET')return json(200,ordering.notifications(user));
+        if(route==='/api/conversations'&&req.method==='GET')return json(200,messaging.inbox(user));
+        const retryMessage=route.match(/^\/api\/messages\/(\d+)\/retry$/);if(retryMessage&&req.method==='POST')return json(200,messaging.retry(user,Number(retryMessage[1])));
+        const conversation=route.match(/^\/api\/conversations\/(\d+)(?:\/(reply|resume))?$/);
+        if(conversation&&req.method==='GET'&&!conversation[2])return json(200,messaging.conversation(user,Number(conversation[1])));
+        if(conversation&&req.method==='POST'&&conversation[2]==='reply')return json(200,messaging.reply(user,Number(conversation[1]),input));
+        if(conversation&&req.method==='POST'&&conversation[2]==='resume')return json(200,messaging.resume(user,Number(conversation[1])));
         if(route==='/api/ordering-config'&&req.method==='GET'){ordering.tables(user);return json(200,{restaurantId:user.restaurant_id,publicBaseUrl:config.PUBLIC_BASE_URL||'',whatsappConfigured:bot.configured()&&Number(config.WHATSAPP_RESTAURANT_ID)===user.restaurant_id});}
         if(route==='/api/customer-tables'&&req.method==='GET')return json(200,ordering.tables(user));
         if(route==='/api/customer-tables'&&req.method==='POST')return json(201,ordering.addTable(user,input));
@@ -139,6 +149,8 @@ export function createApp(store,config=process.env,sendFetch=fetch) {
       res.setHeader('Cache-Control','no-cache');res.end(req.method==='HEAD'?undefined:body);
     }catch(error){const status=error.status||(error.code==='ENOENT'?404:500);if(status===500)console.error('Request failed:',error.message);json(status,{error:status===500?'Internal server error':error.message});}
   });
+  let worker;server.on('listening',()=>{worker=setInterval(()=>messaging.flush().catch(()=>console.error('Customer message worker failed')),5000);worker.unref();});server.on('close',()=>clearInterval(worker));
+  return server;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const data=path.resolve(process.env.DATA_DIR||'data');await mkdir(data,{recursive:true});

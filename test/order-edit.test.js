@@ -11,7 +11,7 @@ test('all service types support audited edits, original prices and tax, addition
  for(const type of ['Dine-in','Takeaway','Delivery']){
   store.updateProduct(owner,1,{price:590,available:true});
   const old=store.createOrder(owner,{...input,type,requestKey:type,expectedTotal:619.5});
-  for(const status of ['preparing','ready','served'])store.status(owner,old.id,status);
+  for(const status of (type==='Delivery'?['preparing','ready','out_for_delivery','served']:['preparing','ready','served']))store.status(owner,old.id,status);
   store.updateProduct(owner,1,{price:900,available:true});
   const added=store.menu(owner).find(p=>p.id!==1&&p.available);
   const subtotal=1180+added.price,total=Math.round(subtotal*100*1.05)/100;

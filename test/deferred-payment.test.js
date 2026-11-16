@@ -12,7 +12,7 @@ test('all service types can enter the kitchen unpaid and settle after serving',t
   const {store,owner}=fixture(t);
   for(const type of ['Dine-in','Takeaway','Delivery']){
     const saved=store.createOrder(owner,order(type));assert.equal(saved.paymentStatus,'unpaid');assert.equal(saved.paidAt,null);assert.equal(saved.status,'queued');
-    for(const status of ['preparing','ready','served'])store.status(owner,saved.id,status);
+    for(const status of (type==='Delivery'?['preparing','ready','out_for_delivery','served']:['preparing','ready','served']))store.status(owner,saved.id,status);
     assert.equal(store.getOrder(owner,saved.id).paymentStatus,'unpaid');
   }
   assert.equal(store.report(owner).length,0);
@@ -42,7 +42,7 @@ test('settlement uses original order total and payment date, with role and tenan
   assert.equal(store.report(owner)[0].date,new Date(Date.parse(paid.paidAt)+5*3600000).toISOString().slice(0,10));
 });
 test('old unpaid orders remain discoverable after more than 200 newer sales',t=>{
-  const {store,owner}=fixture(t),unpaid=store.createOrder(owner,order('Delivery','old'));store.status(owner,unpaid.id,'preparing');store.status(owner,unpaid.id,'ready');store.status(owner,unpaid.id,'served');
+  const {store,owner}=fixture(t),unpaid=store.createOrder(owner,order('Delivery','old'));store.status(owner,unpaid.id,'preparing');store.status(owner,unpaid.id,'ready');store.status(owner,unpaid.id,'out_for_delivery');store.status(owner,unpaid.id,'served');
   for(let i=0;i<205;i++){const o=store.createOrder(owner,{...order('Takeaway','paid-'+i),payment:'Cash'});store.db.prepare("UPDATE orders SET status='served' WHERE id=?").run(o.id);}
   assert.ok(store.orders(owner).some(o=>o.id===unpaid.id));assert.equal(store.orders(owner).length,201);
 });
@@ -50,7 +50,7 @@ test('legacy paid orders migrate correctly and deferred orders survive restart u
   const directory=mkdtempSync(path.join(tmpdir(),'ember-payment-')),filename=path.join(directory,'test.sqlite');let store=openStore(filename);
   try{
     const owner=store.setup(setup),paid=store.createOrder(owner,{...order(),payment:'Cash'});
-    store.db.exec('ALTER TABLE orders DROP COLUMN paid_at');store.db.close();store=openStore(filename);
+    store.db.exec('DROP TRIGGER track_order_paid; ALTER TABLE orders DROP COLUMN paid_at');store.db.close();store=openStore(filename);
     assert.equal(store.getOrder(owner,paid.id).paymentStatus,'paid');assert.equal(store.getOrder(owner,paid.id).paidAt,paid.date);
     const unpaid=store.createOrder(owner,order('Delivery'));store.db.close();store=openStore(filename);
     assert.equal(store.getOrder(owner,unpaid.id).paymentStatus,'unpaid');assert.equal(store.report(owner)[0].orders,1);

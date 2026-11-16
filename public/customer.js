@@ -14,7 +14,7 @@ function render(){
   if(!pending&&!cart.size){app.querySelector('#error').textContent='Choose at least one item.';return;}
   busy=true;app.querySelectorAll('input,textarea,button').forEach(el=>el.disabled=true);
   pending=pending||{requestKey:crypto.randomUUID(),items:[...cart].map(([id,qty])=>({id,qty})),note,expectedTotal:total()};sessionStorage.setItem('table-order:'+token,JSON.stringify(pending));
-  try{const result=await call('/orders',pending);sessionStorage.removeItem('table-order:'+token);pending=null;cart.clear();note='';render();app.querySelector('#result').textContent=`Request #${result.id} received (${result.status}). Please wait for staff confirmation. Payment is due later.`;app.querySelector('#result').scrollIntoView({behavior:'smooth'});}
+  try{const result=await call('/orders',pending);sessionStorage.removeItem('table-order:'+token);pending=null;cart.clear();note='';render();app.querySelector('#result').textContent=`Request #${result.id} received (${result.status}). Please wait for staff confirmation. Payment is due later.`;sessionStorage.setItem('table-tracking:'+token,result.trackingToken);showTracking(result.trackingToken);app.querySelector('#result').scrollIntoView({behavior:'smooth'});}
   catch(e){app.querySelector('#error').textContent=e.message;if(e.status&&e.status<500){pending=null;sessionStorage.removeItem('table-order:'+token);}else app.querySelector('#error').textContent+=' Press Retry to safely check the same request.';}
   finally{busy=false;app.querySelectorAll('input,textarea,button').forEach(el=>el.disabled=!!pending&&el.id!=='submit');app.querySelector('#submit').textContent=pending?'Retry order request':'Send order request';}
  };
@@ -22,3 +22,6 @@ function render(){
 }
 function summary(){app.querySelector('#summary').innerHTML=`${[...cart].map(([id,qty])=>`<p>${qty} × ${html(catalog.items.find(p=>p.id===id).name)}</p>`).join('')||'<p>No items selected yet.</p>'}<strong>Total ${money(total())}</strong>`;}
 try{catalog=await call();try{pending=JSON.parse(sessionStorage.getItem('table-order:'+token));}catch{}if(pending){cart=new Map(pending.items.filter(p=>catalog.items.some(x=>x.id===p.id)).map(p=>[p.id,p.qty]));note=pending.note;}render();if(pending){app.querySelectorAll('input,textarea').forEach(el=>el.disabled=true);app.querySelector('#submit').textContent='Retry previous order request';}}catch(e){app.innerHTML=`<h1>Menu unavailable</h1><p>${html(e.message)}</p><p>Please ask restaurant staff for help.</p>`;}
+
+function showTracking(requestToken){const result=app.querySelector('#result');if(!result)return;const a=document.createElement('a');a.href='/track.html?request='+requestToken;a.textContent='View live order progress';result.append(document.createElement('br'),a);}
+const savedTracking=sessionStorage.getItem('table-tracking:'+token);if(savedTracking)showTracking(savedTracking);

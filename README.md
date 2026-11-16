@@ -95,8 +95,41 @@ CONFIRM
 STATUS 1
 ```
 
-Use actual item IDs returned by `MENU`. `MENU 2` shows the next page. Use `Takeaway` for pickup, or `Dine-in` and include the table in the last field. The bot quotes the total including tax; `CONFIRM` submits a staff-review request, and `CANCEL` clears the draft. Drafts expire after 30 minutes. `STATUS <request number>` checks acceptance only for requests belonging to that sender. Accepted requests become unpaid POS orders; staff can edit and collect payment as usual. Rejection/acceptance notifications are not pushed automatically: customers use STATUS or contact staff.
+Use actual item IDs returned by `MENU`. `MENU 2` shows the next page. Use `Takeaway` for pickup, or `Dine-in` and include the table in the last field. The bot quotes the total including tax; `CONFIRM` submits a staff-review request, and `CANCEL` clears the draft. Drafts expire after 30 minutes. `STATUS <request number>` checks acceptance only for requests belonging to that sender. Accepted requests become unpaid POS orders; staff can edit and collect payment as usual. Accepted takeaway/delivery orders now send progress updates when the customer has opted in and WhatsApp is configured. Customers can also use STATUS or their tracking link. Rejected requests are visible on the tracking page; staff should follow up when needed.
 
 Inbound message IDs and replies are stored for retry handling. A failed Meta send returns an error so webhook delivery can retry without duplicating the order request. In the rare case Meta accepts a reply but the network loses the response, a reply may appear twice; the order request remains deduplicated. No outgoing promotional/template messages, payment collection, natural-language interpretation, or multiple WhatsApp business-number routing is implemented.
 
 **Review-demo limitation:** the existing Render Free `/tmp` database is ephemeral. A reset loses table links, requests, message deduplication, and orders; old printed QR codes stop working. Use durable storage before using this with real restaurant customers. The automated tests cover the local API and mocked Meta delivery; actual phone scanning and live Meta delivery still need verification. Browser automation timed out during this change.
+
+
+## POS alerts, order tracking and staff chat
+
+- The **Customer requests** panel appears on the POS and operations screens for owners/cashiers. It checks for new QR/WhatsApp requests and staff-chat activity every 5 seconds. Open it to accept or reject an order without leaving the till. **Enable sound** activates a short alert in that browser tab; it is optional and does not enable operating-system push notifications. Alerts require the POS page to remain open and connected.
+- Takeaway/delivery checkout now includes an optional international customer phone number and a checkbox confirming the customer's permission for WhatsApp progress messages. Use `+923001234567`, not a local `0300...` number. Orders can still be placed without a phone or WhatsApp consent.
+- Order history includes **Customer tracking** and **Copy tracking link**. Give the link to customers who do not use WhatsApp. QR customers get **View live order progress** after submitting. Tracking pages refresh every 5 seconds, display staff acceptance and subsequent progress, and do not reveal customer names, phone numbers, addresses, or notes. Treat tracking URLs as private links.
+- Takeaway: accepted → preparing → ready for pickup → collected. Delivery: accepted → preparing → ready → out for delivery → delivered. Kitchen staff advance preparation; owners/cashiers can mark dispatch, collection, or delivery from order history. Updating a submitted order records an additional update event; payment recording is also shown. All stages are staff-entered, not GPS tracking.
+- The WhatsApp bot's first reply identifies it as automated and explains **HUMAN**. HUMAN, PERSON, AGENT, STAFF or "talk to a person" opens a staff request and pauses automated ordering replies. Subsequent messages appear in **Operations → WhatsApp inbox**. Staff select the customer, read the transcript and reply in the same WhatsApp conversation. Refresh the selected conversation to see new text; the global alert panel signals new messages. The customer can send **BOT**, or staff can select **End staff chat and resume bot**. Customers are told staff will respond when available, not that someone has instantly joined.
+- **STOP** disables automated progress updates for that WhatsApp sender. **UPDATES** allows them again for eligible orders. Staff messages are restricted to the customer reply window. The inbox shows queued, blocked, retrying, failed, sent, delivered and read message states; sent means Meta accepted the API request, not proof of delivery. Delivery/read require Meta status webhooks. Staff can retry a failed or blocked send after fixing its cause.
+
+### Additional WhatsApp settings
+
+The existing Meta credentials still apply. Set `PUBLIC_BASE_URL` to the public HTTPS POS address so messages contain usable tracking links. WhatsApp remains disabled until configured; the POS alerts and tracking pages work independently.
+
+Within 24 hours of the customer's last WhatsApp message, the system sends plain-text progress updates. To initiate updates for a POS customer who has not messaged the business, or to send after that window closes, create an approved **utility order-status template** in Meta with three body parameters in this order:
+
+```text
+Your order {{1}}: {{2}}. Track your order: {{3}}
+```
+
+Set:
+
+| Variable | Value |
+| --- | --- |
+| `WHATSAPP_STATUS_TEMPLATE` | Exact approved Meta template name |
+| `WHATSAPP_TEMPLATE_LANGUAGE` | Exact language code of that template, such as `en` if approved in that language |
+
+Use a body-only template matching those three placeholders; arbitrary template layouts are not supported. The app cannot approve templates or guarantee delivery. If credentials/template/reply-window requirements are missing, messages remain **blocked** with a reason in the staff inbox. Unconfigured WhatsApp never blocks accepting, preparing or settling an order. See [WhatsApp's customer-service window and template rules](https://business.whatsapp.com/policy).
+
+Events and retry state are stored in SQLite. Sends retry up to five attempts with backoff; later updates for the same order wait behind an earlier failed update to retain sequence. Staff can retry after correcting the problem. Ambiguous network failures can still result in a duplicate WhatsApp message, but cannot duplicate the POS order. The worker runs every 5 seconds while the server is running, and is intended for one server process per database. The existing Render Free ephemeral-storage limitation still applies to events and conversations, and sleeping servers cannot deliver updates until they wake.
+
+Validation: 52 automated tests pass, including delivery sequencing, human handoff, tenant permissions, opt-in/STOP, reply windows/templates, retry handling, provider status receipts and public tracking privacy. Native browser verification was attempted but the computer-use tool could not reliably identify the browser URL and stopped. Live Meta delivery remains unverified until the restaurant connects its WhatsApp account.
