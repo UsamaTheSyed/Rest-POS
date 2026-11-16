@@ -89,3 +89,18 @@ test('unknown messages get concise help, only explicit MENU sends the menu, and 
  await bot.receive({entry:[{changes:[{value:{metadata:{phone_number_id:'123'},statuses:[{id:'unrelated',status:'delivered'}]}}]}]});assert.equal(sent.length,count);
  await bot.receive(event('invalid-page','MENU 999'));assert.match(sent.at(-1).text.body,/valid page number/);
 });
+
+
+test('menu requests accept conversational wording and punctuation without turning unrelated text into a menu request',async t=>{
+ const {bot,sent}=fixture(t);
+ const phrases=['MENU','send menu','Send MENU to browse dishes','send me the Menu','Please send me the menu!','Can you show me your menu?','Could you please share the menu?','Can I see the menu?','I would like to see the menu','menu please','  SEND   ME   THE MENU  ','show menu page 1'];
+ for(let i=0;i<phrases.length;i++){
+  await bot.receive(event('menu-phrase-'+i,phrases[i]));assert.match(sent.at(-1).text.body,/Menu \(PKR/);assert.match(sent.at(-1).text.body,/Page 1 of/);
+ }
+ for(const [i,phrase] of ['I do not want the menu','The menu is broken','My order is wrong'].entries()){
+  await bot.receive(event('not-menu-'+i,phrase));assert.doesNotMatch(sent.at(-1).text.body,/Menu \(PKR/);assert.match(sent.at(-1).text.body,/did not understand/);
+ }
+ await bot.receive(event('page-request','Please send me menu page 999'));assert.match(sent.at(-1).text.body,/valid page number/);
+ await bot.receive(event('zero-page','menu 0'));assert.match(sent.at(-1).text.body,/valid page number/);
+ await bot.receive(event('menu-handoff','HUMAN'));const count=sent.length;await bot.receive(event('staff-mode-menu','send me the menu'));assert.equal(sent.length,count);
+});
