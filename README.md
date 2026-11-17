@@ -168,3 +168,20 @@ The customer tracking page now includes a responsive progress timeline, service-
 The POS has a floating WhatsApp shortcut for owners/cashiers. It opens **Operations → WhatsApp inbox** in a separate tab, keeping the current cart intact. Its badge counts active staff conversations (not unread messages) using the existing notification poll. The button opens the POS staff inbox, not the personal WhatsApp app, and is not shown on the customer menu display or kitchen-only screen.
 
 Validation: desktop and 390-pixel mobile tracking layouts checked in headless Chrome; no mobile horizontal overflow. The connection-loss/recovery states retain the existing order. The existing 62 automated tests pass.
+
+
+## Restaurant website template
+
+A customer-facing storefront is available alongside the POS, with no new build command or API keys. The POS stays at `/`; restaurant sites use `/shop/<slug>`.
+
+1. Deploy the updated server and public files using the existing Render configuration.
+2. Sign in as the restaurant owner and select **Website** in the dashboard header, or open `/website-admin.html`.
+3. Choose a unique website slug, colour palette (clay, forest or plum), headline, story and featured menu photo. The restaurant name comes from POS Settings.
+4. Add the real address, phone, opening-hours text and delivery areas. Enable pickup and/or delivery.
+5. Enable the public website and save. Use **View website** to open and share the resulting `/shop/<slug>` URL.
+
+Websites are disabled by default. Menu names, categories, prices, availability, tags and uploaded images come from the restaurant's POS menu; there is no second catalog to maintain. New page loads read the current menu and the server verifies prices and availability again on submission. The storefront supports category/search filters, product details, an editable cart with typed quantities, local Pakistani phone normalization, delivery-area checks, optional WhatsApp tracking consent, idempotent order requests and private tracking links. The last tracking link is saved in that browser. Menu photos must be the restaurant's own or appropriately licensed.
+
+Website requests appear as **Website** in **Customer orders** and existing POS notifications. Staff accept/reject them; accepted requests become unpaid kitchen orders and use existing progress tracking. WhatsApp updates require the existing WhatsApp configuration. No payment gateway is included: payment is due on delivery or pickup. Delivery has no additional fee in this version. Hours are display text, not an automatic opening schedule; disable the website when unable to accept requests. Disabled sites reject public menu/image access and new requests, while existing private order tracking remains available.
+
+The owner can configure one storefront per restaurant. All configuration, menu images and requests are scoped to that restaurant. Configuration changes appear in Audit. Custom-domain mapping, multi-branch routing, delivery fees and online card payments are not part of this version. Website settings use the same SQLite database as the POS and need the same persistent hosting/backup arrangements.

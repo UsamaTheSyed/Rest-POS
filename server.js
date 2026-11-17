@@ -1,3 +1,4 @@
+import {storefront} from './lib/storefront.js';
 import {languageConfig} from './lib/whatsapp-language.js';
 import {customerMessaging} from './lib/customer-messaging.js';
 import QRCode from 'qrcode';
@@ -13,6 +14,7 @@ import { bootstrapDemo } from './lib/bootstrap.js';
 const root=path.join(path.dirname(fileURLToPath(import.meta.url)),'public');
 export function createApp(store,config=process.env,sendFetch=fetch) {
   const ordering=customerOrdering(store),bot=whatsappBot(store,ordering,config,sendFetch),messaging=customerMessaging(store,config,sendFetch);
+  const website=storefront(store,ordering);
   let webhookQueue=Promise.resolve();
   const publicAttempts=new Map();
   const attempts=new Map();
@@ -75,7 +77,21 @@ export function createApp(store,config=process.env,sendFetch=fetch) {
           }
           fail('Not found',404);
         }
+        const siteRoute=route.match(/^\/api\/storefront\/([a-z0-9-]{1,60})(?:\/(orders|images\/([a-f0-9-]{36})))?$/);
+        if(siteRoute){
+          const slug=siteRoute[1];
+          if(req.method==='GET'&&!siteRoute[2])return json(200,website.catalog(slug));
+          if(req.method==='GET'&&siteRoute[3]){const image=website.image(slug,siteRoute[3]);res.writeHead(200,{'Content-Type':image.content_type,'Cache-Control':'no-store'});return res.end(Buffer.from(image.bytes));}
+          if(req.method==='POST'&&siteRoute[2]==='orders'){
+            const now=Date.now();for(const [k,v] of publicAttempts)if(v.until<now)publicAttempts.delete(k);
+            const key='website:'+slug,attempt=publicAttempts.get(key)||{count:0,until:now+60000};if(attempt.count>=30)fail('Too many requests. Please wait a minute.',429);attempt.count++;publicAttempts.set(key,attempt);
+            return json(201,website.place(slug,input));
+          }
+          fail('Not found',404);
+        }
         const user=store.session(token);if(!user)fail('Please sign in',401);
+        if(route==='/api/website-settings'&&req.method==='GET')return json(200,website.settings(user));
+        if(route==='/api/website-settings'&&req.method==='PUT')return json(200,website.save(user,input));
         const imageRoute=route.match(/^\/api\/menu-images\/([a-f0-9-]{36})$/);
         if(imageRoute&&['GET','HEAD'].includes(req.method)){
           const image=store.menuImage(user,imageRoute[1]);
@@ -143,7 +159,7 @@ export function createApp(store,config=process.env,sendFetch=fetch) {
         fail('API endpoint not found',404);
       }
       if(!['GET','HEAD'].includes(req.method))fail('Method not allowed',405);
-      const filename=path.resolve(root,'.'+decodeURIComponent(route==='/'?'/index.html':route));
+      const filename=path.resolve(root,'.'+decodeURIComponent(route==='/'?'/index.html':/^\/shop\/[a-z0-9-]{1,60}\/?$/.test(route)?'/restaurant.html':route));
       if(!filename.startsWith(root+path.sep))fail('Forbidden',403);
       const body=await readFile(filename);
       res.setHeader('Content-Type',({'html':'text/html; charset=utf-8','css':'text/css','js':'text/javascript','svg':'image/svg+xml'})[filename.split('.').pop()]||'application/octet-stream');
