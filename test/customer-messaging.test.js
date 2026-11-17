@@ -53,7 +53,7 @@ test('human handoff pauses commands, stores messages, scopes staff access, and r
  assert.equal(messaging.conversation(owner,thread.id).messages.filter(m=>m.direction==='customer').length,4);
  assert.throws(()=>messaging.conversation({...owner,restaurant_id:999},thread.id),/not found/);assert.throws(()=>messaging.inbox({...owner,role:'kitchen'}),/Cashier/);
  messaging.reply(owner,thread.id,{message:'Yes, please tell us your address.',requestKey:'reply-1'});messaging.reply(owner,thread.id,{message:'Yes, please tell us your address.',requestKey:'reply-1'});await messaging.flush();assert.equal(sent.length,count+1);
- await bot.receive(event('bot','BOT'));assert.equal(messaging.inbox(owner).threads.length,0);await bot.receive(event('menu','MENU'));assert.match(sent.at(-1).text.body,/Menu/);
+ await bot.receive(event('bot','BOT'));assert.equal(messaging.inbox(owner).threads[0].mode,'bot');assert.equal(ordering.notifications(owner).conversations.length,0);await bot.receive(event('menu','MENU'));assert.match(sent.at(-1).text.body,/Menu/);
 });
 test('STOP disables progress updates and expired staff reply windows reject free-text replies',async t=>{
  const {store,owner,messaging,bot,sent}=fixture(t);await bot.receive(event('hi','MENU'));await bot.receive(event('stop','STOP'));sent.length=0;store.createOrder(owner,input);await messaging.flush();assert.equal(sent.length,0);assert.equal(messaging.inbox(owner).outbox[0].state,'cancelled');
@@ -103,4 +103,30 @@ test('menu requests accept conversational wording and punctuation without turnin
  await bot.receive(event('page-request','Please send me menu page 999'));assert.match(sent.at(-1).text.body,/valid page number/);
  await bot.receive(event('zero-page','menu 0'));assert.match(sent.at(-1).text.body,/valid page number/);
  await bot.receive(event('menu-handoff','HUMAN'));const count=sent.length;await bot.receive(event('staff-mode-menu','send me the menu'));assert.equal(sent.length,count);
+});
+
+
+test('bot conversations stay visible before handoff and after staff resumes the bot',async t=>{
+ const {owner,ordering,messaging,bot}=fixture(t);
+ await bot.receive(event('visible-hello','hello'));
+ const thread=messaging.inbox(owner).threads[0];
+ assert.equal(thread.mode,'bot');
+ assert.equal(messaging.inbox({...owner,role:'cashier'}).threads[0].id,thread.id);
+ assert.equal(messaging.inbox({...owner,restaurant_id:999}).threads.length,0);
+ assert.equal(ordering.notifications(owner).conversations.length,0);
+ const original=messaging.conversation(owner,thread.id).messages;
+ assert.ok(original.some(m=>m.direction==='customer'));
+ assert.ok(original.some(m=>m.direction==='bot'));
+ await bot.receive(event('visible-human','HUMAN'));
+ messaging.reply(owner,thread.id,{message:'How can we help?',requestKey:'visible-reply'});
+ messaging.resume(owner,thread.id);
+ assert.equal(messaging.inbox(owner).threads[0].id,thread.id);
+ assert.equal(messaging.inbox(owner).threads[0].mode,'bot');
+ assert.equal(ordering.notifications(owner).conversations.length,0);
+ await bot.receive(event('visible-menu','MENU'));
+ const messages=messaging.conversation(owner,thread.id).messages;
+ assert.ok(messages.some(m=>m.direction==='staff'&&m.body==='How can we help?'));
+ assert.ok(messages.some(m=>m.id===original[0].id));
+ assert.match(messages.at(-1).body,/Menu/);
+ assert.throws(()=>messaging.reply(owner,thread.id,{message:'Should not interrupt bot',requestKey:'bot-reply'}),/using the bot/);
 });

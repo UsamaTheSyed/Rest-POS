@@ -18,3 +18,5 @@
 /* Keep the reply composer above the persistent order notification tray. */
 @media(max-width:600px){.dashboard-heading{flex-wrap:wrap;gap:8px;margin-bottom:16px}.dashboard-heading>div{width:100%}.dashboard-heading .ops-status{margin:0}.messenger{height:calc(100dvh - 320px);min-height:350px}.message-bubble{flex-shrink:0}.conversation-header,.handoff-banner,.message-composer{flex-shrink:0}}
 .message-bubble,.message-day{flex-shrink:0}
+
+.thread-dot.bot{background:#5298c7}.thread-dot.active{background:#39815b}
