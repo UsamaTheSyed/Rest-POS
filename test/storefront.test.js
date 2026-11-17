@@ -58,3 +58,14 @@ test('website HTTP routes are public while configuration needs owner authenticat
  assert.equal((await fetch(base+'/api/storefront/foodies/orders',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://unrelated.example'},body:JSON.stringify(request)})).status,403);
  assert.equal((await fetch(base+'/api/storefront/unknown')).status,404);
 });
+
+test('website WhatsApp contact is optional, normalized and independently configurable',t=>{
+ const {site,owner,settings}=fixture(t);
+ assert.equal(site.catalog('foodies').whatsappPhone,'');
+ site.save(owner,{...settings,whatsappPhone:'0300 1234567'});
+ assert.equal(site.catalog('foodies').whatsappPhone,'923001234567');
+ const legacy={...site.settings(owner)};delete legacy.whatsappPhone;
+ site.save(owner,legacy);assert.equal(site.catalog('foodies').whatsappPhone,'923001234567');
+ assert.throws(()=>site.save(owner,{...settings,whatsappPhone:'https://example.com'}),/WhatsApp number/);
+ site.save(owner,{...settings,whatsappPhone:''});assert.equal(site.catalog('foodies').whatsappPhone,'');
+});

@@ -7,3 +7,9 @@
 
 .product-info h3 button{font-size:16px}.product-info>p{font-size:12px}.product-info strong{font-size:14px}footer .text-link{margin-top:0;font-size:11px}
 @media(max-width:760px){.product-info h3 button{font-size:14px}.product-info>p{font-size:12px}.product-info strong{font-size:13px}}
+
+/* Keep WhatsApp above the mobile bag bar and out of checkout dialogs. */
+.website-whatsapp{position:fixed;right:24px;bottom:24px;z-index:20;display:flex;align-items:center;gap:10px;min-width:56px;min-height:56px;padding:12px 18px;background:#167a46;color:white;border-radius:32px;box-shadow:0 5px 22px #163c2930;font-size:13px;font-weight:600}
+.website-whatsapp svg{width:30px;height:30px}.website-whatsapp:hover{background:#106237}
+body:has(dialog[open]) .website-whatsapp{visibility:hidden}
+@media(max-width:760px){.website-whatsapp{right:4%;bottom:calc(90px + env(safe-area-inset-bottom,0px));padding:12px}.website-whatsapp span{display:none}}
